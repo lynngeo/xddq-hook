@@ -45,7 +45,7 @@ function createLogFormat(colorize = false) {
 }
 
 const logger = winston.createLogger({
-    level: 'info',
+    level: 'debug',
     levels: customLevels,
     format: createLogFormat(),
     transports: [

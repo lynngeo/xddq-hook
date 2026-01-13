@@ -2,12 +2,8 @@ import { Container } from 'typedi';
 import { Logger } from "winston";
 import { ProtobufMgr } from "./protobufMgr";
 import { Stream } from "./stream";
+import { decodeLikeProtoc,dumpRawByMsgId } from "./decodeRaw";
 
-export interface ParsedMessage<T = any> {
-    msgId: any;
-    playerId: bigint;
-    body: T;
-}
 
 export class MessageProcessor {
     private logger: Logger;
@@ -18,7 +14,7 @@ export class MessageProcessor {
         this.protobufMgr = Container.get<ProtobufMgr>("protobufMgr");
     }
 
-    async parse<T>(hexString: string, isRequest: boolean = true): Promise<ParsedMessage<T> | null> {
+    async parse(hexString: string, isRequest: boolean = true) {
         const hexBytes = Uint8Array.from(Buffer.from(hexString.replace(/[^0-9A-Fa-f]/g, ""), "hex"));
 
         const stream = new Stream();
@@ -33,29 +29,32 @@ export class MessageProcessor {
             this.logger.debug(`msgId: ${msgId}`);
             this.logger.debug(`playerId: ${playerId}`);
             const s = await this.protobufMgr.getMsg(msgId, isRequest);
-            if (!s) {
-                this.logger.info(`Unknown message type for msgId: ${msgId}`);
-            }
 
             const l = new Uint8Array(n - 18);
             l.set(hexBytes.subarray(18, n));
 
-            let body: T = {} as T;
+            let body;
             if (s != null) {
                 this.logger.debug(`Retrieved message type: ${s.name}`);
-                body = s.decode(l) as T;
-                this.logger.debug(`body: ${JSON.stringify(body, null, 2)}`);
-            } else {
-                this.logger.info(`Unknown message type for msgId: ${msgId}`);
-                return null;
-            }
 
-            return { msgId, playerId, body };
+                try{
+                    body = s.decode(l);
+                } catch (e) {
+                    this.logger.error(`protobuf should updated: msgId: ${msgId}`);
+                    const raw = decodeLikeProtoc(l);
+                    dumpRawByMsgId(msgId, raw);
+                    throw e;
+                }
+                this.logger.debug(`body: ${JSON.stringify(body, null, 2)}`);
+                return { msgId, playerId, body };
+            } else {
+                this.logger.info(`Unknown msgId: ${msgId}, hexString: ${hexString}`);
+            }
         }
         return null;
     }
 
-    async create<T>(playerId: any, protocol: number, msgBody: T): Promise<string> {
+    async create(playerId: any, protocol: number, msgBody: any): Promise<string> {
         this.logger.debug(`debug ${protocol} ${JSON.stringify(msgBody, null, 2)}`);
         const s = await this.protobufMgr.getMsg(protocol, true);
 
@@ -77,9 +76,7 @@ export class MessageProcessor {
         stream.writeInt(stream.offset, 2);
 
         const t = new Uint8Array(stream.offset);
-        if (stream.buff) {
-            t.set(stream.buff.subarray(0, stream.offset));
-        }
+        t.set(stream.buff.subarray(0, stream.offset));
         stream.buff = t;
         stream.streamsize = stream.offset;
 
