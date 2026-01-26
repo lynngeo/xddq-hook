@@ -49,6 +49,8 @@ export class MessageProcessor {
                 return { msgId, playerId, body };
             } else {
                 this.logger.info(`Unknown msgId: ${msgId}, hexString: ${hexString}`);
+                const raw = decodeLikeProtoc(l);
+                dumpRawByMsgId(msgId, raw);
             }
         }
         return null;

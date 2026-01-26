@@ -45,7 +45,7 @@ message PlayerBaseDataMsg {
     optional int32 headIcon = 2; 
     optional string nickName = 3; 
     optional int32 realmsId = 4; 
-    optional int64 fightValue = 5; 
+    optional string fightValue = 5; 
     optional UnionBaseData unionData = 6;
     optional int32 appearanceId = 7; 
     optional int64 serverId = 8; 
